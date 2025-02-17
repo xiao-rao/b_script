@@ -32,9 +32,7 @@ RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
         yum install -y \
         pango.x86_64 libXcomposite.x86_64 libXcursor.x86_64 libXdamage.x86_64 \
         libXext.x86_64 libXi.x86_64 libXtst.x86_64 cups-libs.x86_64 libXScrnSaver.x86_64 \
-        libXrandr.x86_64 GConf2.x86_64 alsa-lib.x86_64 atk.x86_64 gtk3.x86_64 \
-        ipa-gothic-fonts xorg-x11-fonts-100dpi xorg-x11-fonts-75dpi xorg-x11-utils \
-        xorg-x11-fonts-cyrillic xorg-x11-fonts-Type1 xorg-x11-fonts-misc && \
+        libXrandr.x86_64 GConf2.x86_64 alsa-lib.x86_64 atk.x86_64 gtk3.x86_64 && \
         rm google-chrome-stable_current_x86_64.rpm && \
         yum clean all ; \
     elif [ "$SYSTEM_TYPE" = "fedora" ]; then \
@@ -45,15 +43,13 @@ RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
         dnf install -y \
         pango libXcomposite libXcursor libXdamage \
         libXext libXi libXtst cups-libs libXScrnSaver \
-        libXrandr GConf2 alsa-lib atk gtk3 \
-        ipa-gothic-fonts xorg-x11-fonts-100dpi xorg-x11-fonts-75dpi xorg-x11-utils \
-        xorg-x11-fonts-cyrillic xorg-x11-fonts-Type1 xorg-x11-fonts-misc && \
+        libXrandr GConf2 alsa-lib atk gtk3 && \
         rm google-chrome-stable_current_x86_64.rpm && \
         dnf clean all ; \
     fi
 
 # 克隆仓库中的代码
-RUN git clone --single-branch --branch master https://github.com/xiao-rao/b_script.git /app
+COPY . /app/
 
 # 创建配置文件，根据不同系统设置不同的 Chrome 路径
 RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
@@ -84,34 +80,39 @@ RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
         pip3 install -r requirements.txt ; \
     fi
 
-# 安装 Playwright 和 Chrome
+# 安装 Playwright
 RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
         pip install --upgrade pip && \
         pip install playwright && \
-        playwright install && \
-        playwright install chrome && \
-        # 创建软链接确保路径正确
-        ln -sf /usr/bin/google-chrome /opt/google/chrome/chrome ; \
+        playwright install chromium ; \
     else \
         pip3 install --upgrade pip && \
         pip3 install playwright && \
-        playwright install && \
-        playwright install chrome && \
-        # 创建软链接确保路径正确
-        mkdir -p /opt/google/chrome && \
-        ln -sf /usr/bin/google-chrome-stable /opt/google/chrome/chrome ; \
+        playwright install chromium ; \
     fi
-
-# 验证 Chrome 安装和软链接
-RUN ls -l /opt/google/chrome/chrome && \
-    /opt/google/chrome/chrome --version
 
 # 确保配置文件权限正确
 RUN chmod 644 /app/config.json
 
+# 验证 Chrome 安装
+RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
+        google-chrome --version ; \
+    else \
+        google-chrome-stable --version ; \
+    fi
+
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
 ENV SYSTEM_TYPE=${SYSTEM_TYPE}
+
+# 创建非 root 用户
+RUN groupadd -r chrome && useradd -r -g chrome -G audio,video chrome \
+    && mkdir -p /home/chrome \
+    && chown -R chrome:chrome /home/chrome \
+    && chown -R chrome:chrome /app
+
+# 切换到非 root 用户
+USER chrome
 
 # 运行脚本
 CMD ["python3", "client.py"]
