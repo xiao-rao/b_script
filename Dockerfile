@@ -4,12 +4,13 @@ FROM python:3.10-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖，包括 Playwright 所需的依赖
+# 安装系统依赖，包括 git 和 Playwright 所需的其他依赖
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
     gnupg2 \
     ca-certificates \
+    git \
     libx11-xcb1 \
     libxcomposite1 \
     libxdamage1 \
