@@ -84,26 +84,30 @@ RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
         pip3 install -r requirements.txt ; \
     fi
 
-# 安装 Playwright
+# 安装 Playwright 和 Chrome
 RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
         pip install --upgrade pip && \
         pip install playwright && \
-        python3 -m playwright install chromium ; \
+        playwright install && \
+        playwright install chrome && \
+        # 创建软链接确保路径正确
+        ln -sf /usr/bin/google-chrome /opt/google/chrome/chrome ; \
     else \
         pip3 install --upgrade pip && \
         pip3 install playwright && \
-        python3 -m playwright install chromium ; \
+        playwright install && \
+        playwright install chrome && \
+        # 创建软链接确保路径正确
+        mkdir -p /opt/google/chrome && \
+        ln -sf /usr/bin/google-chrome-stable /opt/google/chrome/chrome ; \
     fi
+
+# 验证 Chrome 安装和软链接
+RUN ls -l /opt/google/chrome/chrome && \
+    /opt/google/chrome/chrome --version
 
 # 确保配置文件权限正确
 RUN chmod 644 /app/config.json
-
-# 验证 Chrome 安装
-RUN if [ "$SYSTEM_TYPE" = "debian" ]; then \
-        google-chrome --version ; \
-    else \
-        google-chrome-stable --version ; \
-    fi
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1

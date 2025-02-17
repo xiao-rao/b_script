@@ -103,64 +103,42 @@ class LiveClient:
         try:
             playwright = await async_playwright().start()
             
-            # 获取系统类型
-            system = platform.system().lower()
             launch_options = {
-                'headless': False,
+                'headless': True,  # 无头模式
                 'args': [
-                    '--autoplay-policy=no-user-gesture-required',
-                    '--disable-web-security',
-                    '--disable-features=IsolateOrigins,site-per-process',
-                    '--disable-site-isolation-trials',
-                    '--disable-infobars',
-                    '--no-first-run',
-                    '--no-default-browser-check',
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
-                    '--ignore-certificate-errors',
-                    '--disable-notifications',
-                    '--disable-popup-blocking',
-                    '--disable-extensions',
-                    '--disable-component-extensions-with-background-pages',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding',
-                    '--disable-background-networking',
                     '--disable-dev-shm-usage',
-                    '--disable-ipc-flooding-protection',
-                    '--enable-features=NetworkService,NetworkServiceInProcess',
-                    '--force-color-profile=srgb',
-                    '--use-fake-ui-for-media-stream',
-                    '--use-fake-device-for-media-stream',
-                    '--disable-blink-features=AutomationControlled'
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--autoplay-policy=no-user-gesture-required',  # 允许自动播放
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-site-isolation-trials',
+                    '--mute-audio'  # 静音播放
                 ]
             }
             
-            # 根据系统类型决定是否需要指定 executable_path
-            if system == 'linux':
-                chrome_path = self._get_chrome_path()
-                if chrome_path:
-                    launch_options['executable_path'] = chrome_path
-                else:
-                    launch_options['channel'] = 'chrome'
-            else:
-                # Windows 和 Mac 系统直接使用 channel
-                launch_options['channel'] = 'chrome'
+            # 获取 Chrome 路径
+            chrome_path = self._get_chrome_path()
+            if chrome_path and os.path.exists(chrome_path):
+                launch_options['executable_path'] = chrome_path
+                logger.info(f"使用 Chrome 路径: {chrome_path}")
             
             self.browser = await playwright.chromium.launch(**launch_options)
+            logger.info("浏览器启动成功")
             
             # 创建上下文
             self.context = await self.browser.new_context(
                 viewport={'width': 1280, 'height': 720},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 ignore_https_errors=True,
-                bypass_csp=True,  # 绕过内容安全策略
-                permissions=['notifications']  # 授予通知权限
+                bypass_csp=True
             )
 
             # 配置请求拦截
             await self.context.route("**/*", lambda route: route.continue_())
             
+            logger.info("浏览器初始化完成")
             return True
         except Exception as e:
             logger.error(f"初始化浏览器失败: {e}")
