@@ -387,7 +387,7 @@ class LiveClient:
 async def main():
     try:
         # 从环境变量或配置文件获取服务器URL
-        server_url = "http://localhost:8000"  # 替换为实际的服务器地址
+        server_url = "http://172.16.1.205:8000"  # 替换为实际的服务器地址
         client = LiveClient(server_url)
         await client.run()
     except KeyboardInterrupt:
