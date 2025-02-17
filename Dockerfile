@@ -29,12 +29,7 @@ RUN apt-get update && apt-get install -y \
     libdbus-1-3 \
     libgdk-pixbuf2.0-0 \
     libx11-6 \
-    && rm -rf /var/lib/apt/lists/*
-
-# 安装 Playwright 和浏览器
-RUN pip install --upgrade pip
-RUN pip install playwright
-RUN python3 -m playwright install
+    libx11-6 && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # 克隆仓库中的代码
 RUN git clone --single-branch --branch master https://github.com/xiao-rao/b_script.git /app
@@ -43,5 +38,10 @@ RUN git clone --single-branch --branch master https://github.com/xiao-rao/b_scri
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+# 安装 Playwright 和浏览器
+RUN pip install --upgrade pip
+RUN pip install playwright
+RUN python3 -m playwright install
+
 # 运行脚本
-CMD ["python3", "run.py"]
+CMD ["python3", "client.py"]
