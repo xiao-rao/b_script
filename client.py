@@ -8,6 +8,7 @@ from typing import Optional
 from playwright.async_api import async_playwright
 import random
 import os
+import platform
 
 # 配置日志
 logging.basicConfig(
@@ -19,7 +20,8 @@ logger = logging.getLogger(__name__)
 class LiveClient:
     def __init__(self, server_url: str):
         self.server_url = server_url.rstrip('/')
-        self.client_id = str(uuid.uuid4())  # 生成唯一客户端ID
+        self.config_file = 'config.json'
+        self.client_id = self._get_or_create_client_id()
         self.current_task: Optional[dict] = None
         self.client = httpx.AsyncClient(timeout=30.0)
         self.is_running = True
@@ -28,14 +30,84 @@ class LiveClient:
         self.context = None
         self.page = None
 
+    def _get_or_create_client_id(self) -> str:
+        """获取或创建客户端ID"""
+        try:
+            # 如果配置文件不存在，创建默认配置
+            if not os.path.exists(self.config_file):
+                default_config = {
+                    "client_id": None,
+                    "chrome_path": {
+                        "windows": "",
+                        "darwin": "",
+                        "linux": "/usr/bin/google-chrome"
+                    }
+                }
+                with open(self.config_file, 'w') as f:
+                    json.dump(default_config, f, indent=2)
+
+            # 读取配置文件
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+
+            # 如果没有client_id，生成新的并保存
+            if not config.get("client_id"):
+                config["client_id"] = str(uuid.uuid4())
+                with open(self.config_file, 'w') as f:
+                    json.dump(config, f, indent=2)
+
+            return config["client_id"]
+        except Exception as e:
+            logger.error(f"获取客户端ID失败: {e}")
+            return str(uuid.uuid4())  # 如果出错，返回临时ID
+
+    def _get_chrome_path(self) -> str:
+        """从配置文件获取Chrome路径"""
+        try:
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+            
+            system = platform.system().lower()
+            if system == 'linux':
+                # 检查不同的可能路径
+                possible_paths = [
+                    '/usr/bin/google-chrome',
+                    '/usr/bin/google-chrome-stable',
+                    '/usr/bin/chromium-browser',
+                    '/usr/bin/chromium'
+                ]
+                
+                # 首先使用配置文件中的路径
+                chrome_path = config["chrome_path"].get(system, "")
+                if chrome_path and os.path.exists(chrome_path):
+                    return chrome_path
+                    
+                # 如果配置文件中的路径无效，尝试其他可能的路径
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        # 更新配置文件
+                        config["chrome_path"]["linux"] = path
+                        with open(self.config_file, 'w') as f:
+                            json.dump(config, f, indent=2)
+                        return path
+                        
+                return ""  # 如果都找不到，返回空字符串
+            else:
+                return config["chrome_path"].get(system, "")
+        except Exception as e:
+            logger.error(f"获取Chrome路径失败: {e}")
+            return ""
+
     async def init_browser(self):
         """初始化浏览器"""
         try:
             playwright = await async_playwright().start()
-            self.browser = await playwright.chromium.launch(
-                headless=False,
-                channel='chrome',
-                args=[
+            
+            # 获取系统类型
+            system = platform.system().lower()
+            launch_options = {
+                'headless': False,
+                'args': [
                     '--autoplay-policy=no-user-gesture-required',
                     '--disable-web-security',
                     '--disable-features=IsolateOrigins,site-per-process',
@@ -62,7 +134,20 @@ class LiveClient:
                     '--use-fake-device-for-media-stream',
                     '--disable-blink-features=AutomationControlled'
                 ]
-            )
+            }
+            
+            # 根据系统类型决定是否需要指定 executable_path
+            if system == 'linux':
+                chrome_path = self._get_chrome_path()
+                if chrome_path:
+                    launch_options['executable_path'] = chrome_path
+                else:
+                    launch_options['channel'] = 'chrome'
+            else:
+                # Windows 和 Mac 系统直接使用 channel
+                launch_options['channel'] = 'chrome'
+            
+            self.browser = await playwright.chromium.launch(**launch_options)
             
             # 创建上下文
             self.context = await self.browser.new_context(
